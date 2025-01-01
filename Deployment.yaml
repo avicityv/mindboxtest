@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: webapp-deployment
+ labels:
+   app: webapp
+spec:
+ replicas: 4 # По умолчанию пусть будет 4, так при изменении манифеста/апдейтах не будет значительных просадок в производительности в любое время суток. 
+ selector:
+   matchLabels:
+     app: webapp
+ template:
+   metadata:
+     labels:
+       app: webapp
+   spec:
+      affinity:
+        podAffinity:  #     Предпочтительное размещение в разных зонах
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80  # Высокий вес для проверки по зоне, если нет в зоне - то ставит в неё. 
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: DoesNotExist  # Оператор означает, что если в ЗОНЕ нет пода с ключом app - value:webapp, kubelet'у надо ставить его в эту зону. 
+                      values:
+                        - webapp
+                topologyKey: failure-domain.beta.kubernetes.io/zone  # Зона, возможно тут потребуются проверки по всем зонам кластера.
+                                                                     # не работал с AWS, не знаю как точно это работает. 
+        podAntiAffinity:  # Предпочтительное размещение на разных нодах
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 20  # Меньший вес для проверки по ноде, если проверки по зонам кончились, ставит на неназначенные ноды. 
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: DoesNotExist  # Оператор(в теории) означает, что если в НОДЕ нет пода с ключом app - value:webapp, kubelet'у надо ставить его в эту зону.  
+                      values:
+                        - webapp
+                topologyKey: "hostname"  # Нода
+   containers:
+     - name: webapp
+       image: webapp:latest
+       ports:
+        - containerPort: 80
+       resources:
+        limits:
+          memory: 141Mi # best practice — requests * 1.1 при стабильных нагрузках
+          cpu: 1000m #    Возьмём за основу, что "значительные" нагрузки при инициализации — нагрузки на порядок выше. 
+        requests:
+          memory: 128Mi # по тз
+          cpu: 100m #     по тз
+ strategy:          #     отказоустойчивость при обновлении 
+   type: RollingUpdate
+   rollingUpdate:
+     maxUnavailable: 1

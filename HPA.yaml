@@ -1,0 +1,25 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler 
+metadata:
+  name: webapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: webapp
+  minReplicas: 1 # Для отказоустойчивости беда конечно, но если экономим ресурсы ночью, пойдёт.
+  maxReplicas: 4 # по тз
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 200M #Увеличивать количество реплик при average нагрзуке х2 на cpu от обычной.  
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 141Mi #Увеличивать количество реплик при пиковых average нагрузках на память
+  
